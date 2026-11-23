@@ -72,7 +72,7 @@ function checkSkills(skills, where, problems) {
         problems.push(`${where} must be a list.`);
         return;
     }
-    if (skills.length > LIMITS.skills) problems.push(`${where} may hold at most ${LIMITS.skills} skills.`);
+    if (skills.length > LIMITS.skillsStored) problems.push(`${where} may hold at most ${LIMITS.skillsStored} skills.`);
     skills.forEach((skill, index) => {
         const skillWhere = `${where}.${index}`;
         if (!checkShape(skill, skillWhere, has(skill ?? {}, 'learned') ? [...SKILL_KEYS, 'learned'] : SKILL_KEYS, problems)) return;
@@ -109,7 +109,7 @@ function checkPractice(practice, where, problems) {
         return;
     }
     const keys = Object.keys(practice);
-    if (keys.length > LIMITS.skills * 4) problems.push(`${where} holds too many skills.`);
+    if (keys.length > LIMITS.practiceStored) problems.push(`${where} holds too many skills.`);
     for (const key of keys) {
         if (key.length > LIMITS.name) problems.push(`${where}.${key.slice(0, 20)} has a key longer than ${LIMITS.name} characters.`);
         else if (!isInt(practice[key], 0, LIMITS.practiceMax)) problems.push(`${where}.${key} must be a whole number from 0 to ${LIMITS.practiceMax}.`);
@@ -196,7 +196,10 @@ function checkFallen(fallen, where, problems) {
 
 function checkMember(member, key, problems) {
     const where = `members.${key}`;
-    if (!checkShape(member, where, MEMBER_KEYS, problems)) return;
+    // (`granted` is optional: a member made before it, or at level 1, has none)
+    const { granted, ...shape } = member ?? {};
+    if (!checkShape(shape, where, MEMBER_KEYS, problems)) return;
+    if (granted !== undefined && !isInt(granted, 1, LIMITS.levelMax - 1)) problems.push(`${where}.granted must be a whole number from 1 to ${LIMITS.levelMax - 1}.`);
     if (typeof member.id !== 'string' || !ID_PATTERN.test(member.id)) problems.push(`${where}.id is not a valid id.`);
     if (member.id !== key) problems.push(`${where}.id must equal its member key.`);
     if (typeof member.name !== 'string' || member.name.length > LIMITS.name) {
@@ -235,11 +238,13 @@ function checkDice(dice, problems) {
         }
         // used (dice taken so far), hardest (difficulty index) and threat (word index) are kept by the reply's `? try` lines.
         const base = {};
-        for (const key of Object.keys(record)) if (!['used', 'hardest', 'threat'].includes(key)) base[key] = record[key];
+        for (const key of Object.keys(record)) if (!['used', 'hardest', 'threat', 'rules'].includes(key)) base[key] = record[key];
         if (!checkShape(base, where, ['list', 'floor'], problems)) continue;
         if (has(record, 'used') && !isInt(record.used, 0, 3)) problems.push(`${where}.used must be a whole number from 0 to 3.`);
         if (has(record, 'hardest') && !isInt(record.hardest, 0, 4)) problems.push(`${where}.hardest must be a whole number from 0 to 4.`);
         if (has(record, 'threat') && !isInt(record.threat, 0, 5)) problems.push(`${where}.threat must be a whole number from 0 to 5.`);
+        // rules: the level cap and XP rate the reply was written under (only when not the defaults).
+        if (has(record, 'rules') && !(isObject(record.rules) && isInt(record.rules.cap, 1, LIMITS.levelMax) && isInt(record.rules.rate, 50, 300))) problems.push(`${where}.rules must hold a cap and a rate.`);
         if (!Array.isArray(record.list) || record.list.length !== 3) {
             problems.push(`${where}.list must hold exactly three dice.`);
         } else {
