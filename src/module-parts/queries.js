@@ -5,6 +5,7 @@ import { active } from './active.js';
 import { DOMAIN } from '../domain/shape.js';
 import { minutesOf } from './conditions.js';
 import { gearOf } from './gear.js';
+import { statLabelsOf } from './stat-labels.js';
 import { rowOf } from './sheet-row.js';
 import { levelOf } from './standing.js';
 import { rulesOf } from './rules-now.js';
@@ -29,11 +30,13 @@ export function queriesOf(sdk) {
         'party.pc': gate(state => { const pc = membersOf(state).find(member => member.pc); return pc ? { id: pc.id } : null; }),
         'party.levels': gate(state => membersOf(state).map(member => ({ id: member.id, name: member.name, level: levelOf(member), left: false })), { fallback: true }),
         'party.actors': gate(state => membersOf(state).map(member => ({ id: member.id, name: member.name, ...(member.pc ? { pc: true } : {}) }))),
+        // The seven names the gear's stats show under while Text RPG is on, in the gear's order (the inventory answers with its own names otherwise).
+        'gear.statLabels': gate(() => statLabelsOf(sdk)),
         // The dice of the latest dice step (drawn before the reply being written), or null.
         // The level cap and the XP rate the Rules page says now (the wizard's starting level is held to the cap).
         'textRpg.rules': gate(() => rulesOf(sdk)),
         // The saved character file of one member, for the Party tab's Export (the row names this query): { id, inventory?, money? } → { ok, name, fileName, text, own, level, points, items, money } | { ok: false, message }. Stores nothing.
-        'textRpg.export': gate((state, args) => exportFile(state, args)),
+        'textRpg.export': gate((state, args, tools) => exportFile(state, args, tools?.query)),
         // What the reply at `index` rolled, cost, taught and earned, from its own receipts (the cards under the reply read it): { index, names? } → { rolls, spends, xp }.
         'textRpg.rolls': gate((state, args, tools) => rollsAnswer(tools?.receipts?.() ?? [], args)),
         'textRpg.dice': gate((state, args, tools) => lastDice(tools?.receipts?.())),
