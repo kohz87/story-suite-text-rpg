@@ -37,7 +37,7 @@ function topOfStage(stage, max) {
     return Math.min(max, Math.max(1, tops[stage]));
 }
 
-/** How many health stages each roll band costs when the roll is made in danger. */
+/** How many health stages each roll band costs when the roller is struck. */
 export const HARM_STAGES = Object.freeze({ great: 0, success: 0, cost: 1, failure: 1, bad: 2 });
 
 /**
@@ -51,7 +51,7 @@ export function poolMax(kind, stats, level = 1) {
     return 8 + Math.floor(lv / 4) + Math.floor((statValue(stats, pair[0]) + statValue(stats, pair[1])) / 4);
 }
 
-/** The stages a band drops: bad always, others only when in danger; an unknown band drops none. */
+/** The stages a band drops: bad always, others only when `inDanger` (`? try` passes it for a hit, and asks only then); an unknown band drops none. */
 export function harmFor(band, inDanger) {
     const key = typeof band === 'string' ? band.trim().toLowerCase() : '';
     if (!Object.hasOwn(HARM_STAGES, key)) return 0;
