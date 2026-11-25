@@ -1,9 +1,9 @@
 // `+ xp Party — what was overcome [| foes: N] [| group: Name]`: experience. Each foe that fell pays its kind's XP times its group's threat, up to the foes still standing in the foes record, and a battle pays no more than its cap; with no roll in the reply nothing is paid but the foes are still counted down. With nothing standing and no battle current (none yet, or the last one closed more than 60 story minutes ago; with no clock, before the reply just after its close): 10 XP when a roll succeeded this reply, else none; while the battle still stands or has just closed, nothing (its XP was paid as the foes fell). The cap is the strongest group's, scaled by the XP rate like the XP. An old line's `size:` and `threat:` are ignored. Level and stat points follow from xp (standing.js).
-import { memberNamed, players } from '../members.js';
+import { players } from '../members.js';
 import { labelOf } from '../line-read.js';
 import { requireActive } from '../active.js';
 import { levelOf } from '../standing.js';
-import { LEVEL, scaleXp } from '../../rules/levels.js';
+import { LEVEL, scaleXp, xpOfLevel } from '../../rules/levels.js';
 import { readRules, xpCeiling } from '../rules-now.js';
 import { groupId, standing } from '../foes-record.js';
 import { touch } from '../foes-stale.js';
@@ -65,13 +65,19 @@ export function applyXp(ctx, line) {
         raw = record?.won && !over ? NO_RECORD : 0;
     }
     const amount = scaleXp(raw, rate);
-    const named = memberNamed(slice, line.name);
-    const who = named && !named.companion && !named.fallen ? [named] : players(slice).map(p => slice.members[p.id]);
+    // (companions earn with the party: those who play, then the companions; the fallen earn nothing. A companion's share is marked
+    // within them, so a replay with the reply they joined in deleted passes it over and keeps the rest of the block)
+    const companions = Object.values(slice.members).filter(member => member.companion && !member.fallen);
+    // (the line pays the whole party whoever it names: the reader's character and every companion)
+    const who = [...players(slice).map(p => slice.members[p.id]), ...companions];
     const levels = [];
     for (const member of who) {
         const before = levelOf(member);
+        if (member.companion && typeof ctx.ifThere === 'function') ctx.ifThere(DOMAIN, `/members/${member.id}`);
+        // (a companion's xp counts from the level they joined at, so the level cap stands where it does for everyone)
+        const ceiling = xpCeiling(cap) - (member.companion ? xpOfLevel(member.companion.level) : 0);
         member.xp = Math.min(LEVEL.xpMax, member.xp); // (an xp stored past the limit counts as the limit)
-        member.xp += Math.max(0, Math.min(amount, xpCeiling(cap) - member.xp));
+        member.xp += Math.max(0, Math.min(amount, ceiling - member.xp));
         if (levelOf(member) > before) levels.push(`${member.name} reaches level ${levelOf(member)}`);
     }
     const told = `${line.text ? ` for ${line.text}` : ''}${foes > 1 ? ` (${foes} foes)` : ''}`;

@@ -11,8 +11,12 @@ import { levelOf, pointsOf, woundsOf } from './standing.js';
 
 const BARS = [['mp', 'energy', 'Mana'], ['sp', 'energy', 'Stamina']];
 
+// A companion's xp held toward their next level (they level a step every 100 earned with the party); null at the top level.
+const companionHeld = member => (levelOf(member) >= LEVEL.max ? null : Math.max(0, Math.trunc(member.xp)) % LEVEL.xpPerLevel);
+
 /** Percent of the way from this level's first xp to the next level's. */
 function xpPct(member) {
+    if (member.companion) return companionHeld(member) === null ? 100 : companionHeld(member);
     const { next } = levelFor(member.xp);
     if (next === null) return 100;
     return Math.max(0, Math.min(100, Math.round((100 * (member.xp - xpOfLevel(levelOf(member)))) / LEVEL.xpPerLevel)));
@@ -20,6 +24,7 @@ function xpPct(member) {
 
 /** "30/100": the xp held in this level over the 100 a level takes (as the bar shows it); null at the top level. */
 function xpLabel(member) {
+    if (member.companion) return companionHeld(member) === null ? null : `${companionHeld(member)}/${LEVEL.xpPerLevel}`;
     const { next } = levelFor(member.xp);
     return next === null ? null : `${Math.max(0, Math.round(member.xp - xpOfLevel(levelOf(member))))}/${LEVEL.xpPerLevel}`;
 }
@@ -34,7 +39,7 @@ export function rowOf(member, now = null, cap = {}) {
     return {
         id: member.id, name: member.name, portrait: null, level,
         line: companion ? `Lv ${level} · companion` : `Lv ${level}`,
-        xpPct: companion ? 0 : xpPct(member), xpLabel: companion ? null : xpLabel(member), points: pointsOf(member), away: null,
+        xpPct: xpPct(member), xpLabel: xpLabel(member), points: pointsOf(member), away: null,
         bars: companion ? [] : [{ kind: 'hp', value: 5 - wounds, max: 5, label: `Health: ${HEALTH_STAGES[wounds]}` }, ...BARS.map(([kind, scale, label]) => ({ kind, value: pools[kind].now, max: pools[kind].max, label: `${label}: ${stageOf(pools[kind].now, pools[kind].max, scale).word}` }))],
         effects: [...liveConditions(member, now).map(item => item.name), ...member.injuries.map(item => item.name)],
         stats: companion ? null : Object.fromEntries(STAT_KEYS.map(key => [key.toUpperCase(), stats[key]])),
